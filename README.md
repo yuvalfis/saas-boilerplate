@@ -1,308 +1,459 @@
-# SaaS Boilerplate
+# CLAUDE.md
 
-A modern, full-stack SaaS boilerplate built with **Clerk authentication**, **MongoDB**, **NestJS**, and **Next.js** in a **Turborepo** monorepo structure.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## 🚀 Features
+## Commands
 
-- **Authentication**: Clerk integration with user and organization management
-- **Database**: MongoDB with Mongoose ODM
-- **Backend**: NestJS with TypeScript, following repository pattern
-- **Frontend**: Next.js 13+ with App Router and Tailwind CSS
-- **Monorepo**: Turborepo for efficient development and builds
-- **Type Safety**: Shared TypeScript types between frontend and backend
-- **Real-time Sync**: Webhook integration to sync Clerk data with MongoDB
-
-## 📁 Project Structure
-
-```
-saas-boilerplate/
-├── packages/
-│   ├── frontend/          # Next.js frontend application
-│   ├── backend/           # NestJS backend services
-│   └── shared-lib/        # Shared TypeScript types and utilities
-├── package.json           # Root package.json with workspace configuration
-├── turbo.json            # Turborepo configuration
-└── README.md
-```
-
-## 🛠 Tech Stack
-
-- **Frontend**: Next.js 13+, React 18, Tailwind CSS, TypeScript
-- **Backend**: NestJS, MongoDB, Mongoose, TypeScript
-- **Authentication**: Clerk
-- **Monorepo**: Turborepo
-- **UI Components**: Headless UI, Heroicons
-- **Validation**: Class Validator, Class Transformer
-
-## 🚀 Quick Start
-
-### Prerequisites
-
-- Node.js 18+
-- MongoDB (local or cloud)
-- Clerk account
-
-### 1. Clone and Install
+### Development
 
 ```bash
-git clone <repository-url>
-cd saas-boilerplate
+# Install dependencies for all packages
 npm install
+
+# Start all services in development mode (frontend + backend + shared-lib)
+npm run dev
+
+# Build all packages
+npm run build
+
+# Run linting across all packages
+npm run lint
+
+# Run tests across all packages
+npm run test
+
+# Clean build artifacts
+npm run clean
 ```
 
-### 2. Environment Setup
-
-#### Backend Configuration
+### Package-specific commands
 
 ```bash
+# Frontend (Next.js)
+cd packages/frontend
+npm run dev        # Start development server on port 3000
+npm run build      # Build for production
+npm run start      # Start production server
+npm run lint       # Run ESLint
+
+# Backend (NestJS)
 cd packages/backend
-cp .env.example .env
+npm run dev        # Start with hot reload on port 3001
+npm run build      # Build for production
+npm run start:prod # Start production server
+npm run test       # Run unit tests
+npm run test:e2e   # Run e2e tests
 ```
 
-Update `packages/backend/.env`:
+## Architecture
 
-```env
+This is a Turborepo monorepo SaaS boilerplate with three main packages:
+
+### Frontend (packages/frontend)
+
+- **Framework**: Next.js 15 with App Router
+- **Authentication**: Clerk (pre-built components)
+- **Styling**: Tailwind CSS
+- **Protected Routes**: Middleware protects `/dashboard/*` routes
+- **Key Components**:
+  - `DashboardNav`: Navigation with Clerk's OrganizationSwitcher and UserButton
+  - All user/organization management handled by Clerk's built-in components
+
+### Backend (packages/backend)
+
+- **Framework**: NestJS with TypeScript
+- **Database**: MongoDB with Mongoose ODM
+- **Purpose**: Data synchronization via Clerk webhooks only
+- **No API Controllers**: All user operations handled directly by Clerk
+- **Modules**:
+  - `UserModule`: User schema and repository for webhook sync
+  - `OrganizationModule`: Organization schema and repository
+  - `ClerkModule`: Webhook handler that processes all Clerk events
+
+### Shared Library (packages/shared-lib)
+
+- TypeScript types shared between frontend and backend
+- User and Organization interfaces
+
+## Data Flow
+
+1. **Authentication**: All auth operations go directly through Clerk (no backend involvement)
+2. **Data Sync**: Clerk webhooks → Backend webhook handler → MongoDB
+3. **Frontend**: Uses Clerk SDK directly for all user/organization data and operations
+
+## Webhook Events Handled
+
+The backend synchronizes the following Clerk events to MongoDB:
+
+- User: created, updated, deleted
+- Organization: created, updated, deleted
+- OrganizationMembership: created, updated, deleted
+- OrganizationInvitation: created, accepted, revoked
+
+## Authentication Setup
+
+This project uses **Clerk** for authentication with webhook-based data synchronization to MongoDB.
+
+📖 **Complete Setup Guide**: See [CLERK_SETUP.md](./CLERK_SETUP.md) for detailed instructions including:
+
+- Clerk account creation and API keys
+- Environment variable configuration
+- ngrok setup for local webhook development
+- MongoDB connection setup
+- Step-by-step development workflow
+- Troubleshooting guide
+
+### Quick Start
+
+1. **Setup Guide**: Follow [CLERK_SETUP.md](./CLERK_SETUP.md) for complete instructions
+2. **Environment Files**: Create `.env.local` (frontend) and `.env` (backend) with your keys
+3. **Start Development**: Run `npm run dev` and configure webhooks with ngrok
+
+### Required Environment Variables
+
+**Frontend (`.env.local`)**:
+
+```bash
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_your_key_here
+CLERK_SECRET_KEY=sk_test_your_key_here
+NEXT_PUBLIC_API_URL=http://localhost:3001
+```
+
+**Backend (`.env`)**:
+
+```bash
 MONGODB_URI=mongodb://localhost:27017/saas-boilerplate
-CLERK_WEBHOOK_SECRET=your_clerk_webhook_secret
+CLERK_WEBHOOK_SECRET=whsec_your_webhook_secret_here
 PORT=3001
 FRONTEND_URL=http://localhost:3000
 ```
 
-#### Frontend Configuration
+## Repository Pattern
 
-```bash
-cd packages/frontend
-cp .env.local.example .env.local
-```
+Backend uses repository pattern for data access:
 
-Update `packages/frontend/.env.local`:
-
-```env
-NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=your_clerk_publishable_key
-CLERK_SECRET_KEY=your_clerk_secret_key
-NEXT_PUBLIC_CLERK_SIGN_IN_URL=/sign-in
-NEXT_PUBLIC_CLERK_SIGN_UP_URL=/sign-up
-NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL=/dashboard
-NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL=/dashboard
-NEXT_PUBLIC_API_URL=http://localhost:3001
-```
-
-### 3. Clerk Setup
-
-1. Create a Clerk application at [clerk.com](https://clerk.com)
-2. Enable organizations in your Clerk dashboard
-3. Set up webhooks pointing to `http://localhost:3001/webhooks/clerk`
-4. Copy your publishable key, secret key, and webhook secret
-
-### 4. Start Development
-
-```bash
-# Install dependencies
-npm install
-
-# Start all services
-npm run dev
-```
-
-This will start:
-
-- Frontend: http://localhost:3000
-- Backend: http://localhost:3001
-- Shared lib: TypeScript compilation in watch mode
-
-## 📋 Available Scripts
-
-```bash
-# Development
-npm run dev          # Start all packages in development mode
-npm run build        # Build all packages
-npm run lint         # Lint all packages
-npm run clean        # Clean all build artifacts
-
-# Individual packages
-cd packages/frontend && npm run dev    # Frontend only
-cd packages/backend && npm run dev     # Backend only
-```
-
-## 🏗 Architecture
-
-### Backend Architecture
-
-The backend is simplified to only handle data synchronization via webhooks:
-
-```
-packages/backend/src/
-├── modules/
-│   ├── user/
-│   │   ├── user.schema.ts      # MongoDB schema
-│   │   ├── user.repository.ts  # Data access layer
-│   │   └── user.module.ts      # Module definition
-│   ├── organization/           # Organization module (schema + repository)
-│   └── webhook/               # Clerk webhook handling
-├── app.module.ts              # Root module
-└── main.ts                    # Application entry point
-```
-
-### Simplified Architecture
-
-The application uses a simplified architecture focused on data sync:
-
-- **Schemas**: MongoDB models with Mongoose for data persistence
-- **Repositories**: Data access layer for webhook-based synchronization
-- **Webhook Service**: Handles Clerk events and syncs data to MongoDB
-- **No API Controllers**: All user/organization operations handled by Clerk directly
-
-### Frontend Architecture
-
-```
-packages/frontend/src/
-├── app/
-│   ├── dashboard/            # Protected dashboard routes
-│   ├── sign-in/             # Authentication pages
-│   ├── sign-up/
-│   ├── layout.tsx           # Root layout with Clerk provider
-│   └── page.tsx             # Landing page
-└── components/              # Reusable React components
-```
-
-## 🔐 Authentication & Authorization
-
-### User Management
-
-- Automatic user creation via Clerk webhooks
-- Profile management and settings
-- Email verification and password reset
-
-### Organization Management
-
-- Multi-tenant organization support
-- Organization switching
-- Member management with roles (admin/member)
-- Automatic sync with Clerk organizations
-
-### Webhook Integration
-
-The application automatically syncs with Clerk via webhooks for:
-
-- User creation, updates, and deletion
-- Organization creation, updates, and deletion
-- Organization membership changes
-
-## 🗄 Database Schema
-
-### User Schema
-
-```typescript
-{
-  clerkId: string;           // Clerk user ID
-  email: string;             // User email
-  firstName: string;         // First name
-  lastName: string;          // Last name
-  profileImageUrl?: string;  // Profile image
-  organizationIds: ObjectId[]; // Associated organizations
-  currentOrganizationId?: ObjectId; // Active organization
-  createdAt: Date;
-  updatedAt: Date;
-}
-```
-
-### Organization Schema
-
-```typescript
-{
-  clerkId: string;           // Clerk organization ID
-  name: string;              // Organization name
-  slug: string;              // URL-friendly identifier
-  logoUrl?: string;          // Organization logo
-  memberIds: ObjectId[];     // Member user IDs
-  adminIds: ObjectId[];      // Admin user IDs
-  createdAt: Date;
-  updatedAt: Date;
-}
-```
-
-## 🌐 API Endpoints
-
-The backend only exposes webhook endpoints since all user and organization management is handled directly by Clerk:
-
-### Webhook Endpoints
-
-- `POST /webhooks/clerk` - Clerk webhook handler
-
-## 🎨 UI Components
-
-The frontend uses Clerk's built-in components for all authentication and organization management:
-
-- **DashboardNav**: Navigation with Clerk's OrganizationSwitcher and UserButton
-- **OrganizationProfile**: Full organization management interface
-- **UserProfile**: Complete user profile management
-- **CreateOrganization**: Organization creation form
-- **SignIn/SignUp**: Authentication pages
-
-## 🔧 Development
-
-### Adding New Features
-
-1. **Backend Module**: Follow the established pattern
-
-   ```bash
-   mkdir packages/backend/src/modules/your-feature
-   # Create schema, repository, service, controller, module
-   ```
-
-2. **Frontend Components**: Add to `packages/frontend/src/components/`
-
-3. **Shared Types**: Add to `packages/shared-lib/src/types/`
-
-### Database Operations
-
-Always use the repository pattern:
-
-```typescript
-// ✅ Correct
-await this.userRepository.findById(id);
-
-// ❌ Incorrect - never access schema directly
-await this.userModel.findById(id);
-```
-
-## 🚀 Deployment
-
-### Backend Deployment
-
-1. Build the application: `npm run build`
-2. Set environment variables
-3. Deploy to your preferred platform (Vercel, Railway, etc.)
-
-### Frontend Deployment
-
-1. Build the application: `npm run build`
-2. Set environment variables
-3. Deploy to Vercel, Netlify, or similar
-
-### Environment Variables for Production
-
-Update your environment variables for production URLs and credentials.
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes following the established patterns
-4. Submit a pull request
-
-## 📝 License
-
-This project is licensed under the MIT License.
-
-## 🆘 Support
-
-For questions and support:
-
-- Check the [documentation](docs/)
-- Open an issue on GitHub
-- Review the Clerk documentation for authentication setup
+- Never access Mongoose models directly in services
+- Always use repository methods (e.g., `userRepository.findByClerkId()`)
+- Repositories handle all database operations and error handling
 
 ---
 
-Built with ❤️ using modern web technologies.
+# File Structure & Organization Guide
+
+## Project Structure Overview
+
+```
+saas-boilerplate/
+├── packages/
+│   ├── frontend/           # Next.js 15 App Router application
+│   ├── backend/           # NestJS API server
+│   └── shared-lib/        # Shared TypeScript types
+├── turbo.json            # Turborepo configuration
+├── package.json          # Root workspace configuration
+└── CLAUDE.md            # This documentation file
+```
+
+## Package Structure Patterns
+
+### Frontend (Next.js App Router)
+
+```
+packages/frontend/
+├── src/
+│   ├── app/                      # App Router pages & layouts
+│   │   ├── (auth)/              # Route groups for auth pages
+│   │   │   ├── sign-in/[[...sign-in]]/page.tsx
+│   │   │   └── sign-up/[[...sign-up]]/page.tsx
+│   │   ├── dashboard/           # Protected dashboard routes
+│   │   │   ├── layout.tsx       # Dashboard layout with nav
+│   │   │   ├── page.tsx         # Dashboard home
+│   │   │   ├── organizations/   # Org management
+│   │   │   │   └── [[...rest]]/page.tsx  # Catch-all for Clerk
+│   │   │   └── settings/        # User settings
+│   │   │       └── [[...rest]]/page.tsx  # Catch-all for Clerk
+│   │   ├── layout.tsx           # Root layout with providers
+│   │   ├── page.tsx             # Landing page
+│   │   └── globals.css          # Global styles
+│   ├── components/              # Reusable UI components
+│   │   ├── DashboardNav.tsx     # Navigation component
+│   │   └── examples/            # Example components
+│   ├── hooks/                   # Custom React hooks
+│   │   └── use-current-user.ts  # User data fetching hook
+│   ├── lib/                     # Utility libraries
+│   │   └── api/                 # API client setup
+│   │       ├── client.ts        # Axios configuration
+│   │       └── endpoints/       # API endpoint functions
+│   ├── providers/               # React context providers
+│   │   └── api-provider.tsx     # API client provider
+│   └── middleware.ts            # Next.js middleware for auth
+├── next.config.js               # Next.js configuration
+├── tailwind.config.js           # Tailwind CSS configuration
+├── postcss.config.js            # PostCSS configuration
+└── tsconfig.json                # TypeScript configuration
+```
+
+### Backend (NestJS)
+
+```
+packages/backend/
+├── src/
+│   ├── modules/                 # Feature modules
+│   │   ├── auth/               # Authentication module
+│   │   │   ├── auth.module.ts  # Module definition
+│   │   │   ├── auth.service.ts # Auth business logic
+│   │   │   ├── decorators/     # Custom decorators
+│   │   │   │   └── current-user.decorator.ts
+│   │   │   └── guards/         # Auth guards
+│   │   │       └── clerk-auth.guard.ts
+│   │   ├── clerk/              # Clerk webhook handling
+│   │   │   ├── clerk.controller.ts  # Webhook endpoints
+│   │   │   ├── clerk.service.ts     # Webhook processing
+│   │   │   └── clerk.module.ts      # Module definition
+│   │   ├── logger/             # Logging infrastructure
+│   │   │   ├── logger.module.ts
+│   │   │   ├── logger.factory.ts
+│   │   │   ├── enhanced-logger.service.ts
+│   │   │   └── index.ts        # Barrel export
+│   │   ├── user/               # User management
+│   │   │   ├── db/             # Database layer
+│   │   │   │   ├── user.schema.ts    # Mongoose schema
+│   │   │   │   └── user.repository.ts # Data access layer
+│   │   │   ├── user.controller.ts    # REST endpoints
+│   │   │   └── user.module.ts        # Module definition
+│   │   └── organization/       # Organization management
+│   │       ├── db/
+│   │       │   ├── organization.schema.ts
+│   │       │   └── organization.repository.ts
+│   │       └── organization.module.ts
+│   ├── app.module.ts           # Root application module
+│   └── main.ts                 # Application bootstrap
+├── nest-cli.json               # Nest CLI configuration
+├── eslint.config.js            # ESLint configuration
+└── tsconfig.json               # TypeScript configuration
+```
+
+### Shared Library
+
+```
+packages/shared-lib/
+├── src/
+│   ├── types/                  # Shared TypeScript types
+│   │   ├── api/               # API-specific types
+│   │   │   ├── index.ts       # Barrel export
+│   │   │   └── user-api.types.ts  # User API types
+│   │   ├── api.types.ts       # General API types
+│   │   ├── user.types.ts      # User entity types
+│   │   └── organization.types.ts  # Organization types
+│   └── index.ts               # Main barrel export
+└── tsconfig.json              # TypeScript configuration
+```
+
+## Naming Conventions
+
+### Files & Directories
+
+- **Components**: PascalCase (e.g., `DashboardNav.tsx`, `UserProfile.tsx`)
+- **Pages**: kebab-case for directories, `page.tsx` for files (App Router convention)
+- **Hooks**: camelCase with `use` prefix (e.g., `use-current-user.ts`)
+- **Services**: camelCase with `.service.ts` suffix (e.g., `auth.service.ts`)
+- **Modules**: camelCase with `.module.ts` suffix (e.g., `user.module.ts`)
+- **Schemas**: camelCase with `.schema.ts` suffix (e.g., `user.schema.ts`)
+- **Repositories**: camelCase with `.repository.ts` suffix (e.g., `user.repository.ts`)
+- **Types**: camelCase with `.types.ts` suffix (e.g., `user.types.ts`)
+- **Guards**: camelCase with `.guard.ts` suffix (e.g., `clerk-auth.guard.ts`)
+- **Decorators**: camelCase with `.decorator.ts` suffix (e.g., `current-user.decorator.ts`)
+
+### Code Conventions
+
+- **Interfaces**: PascalCase with `I` prefix for shared types (e.g., `IUser`, `IOrganization`)
+- **Classes**: PascalCase (e.g., `UserService`, `AuthGuard`)
+- **Functions**: camelCase (e.g., `getCurrentUser`, `validateToken`)
+- **Constants**: SCREAMING_SNAKE_CASE (e.g., `API_ENDPOINTS`, `DEFAULT_TIMEOUT`)
+- **Environment Variables**: SCREAMING_SNAKE_CASE (e.g., `CLERK_SECRET_KEY`)
+
+## Directory Organization Patterns
+
+### 1. Feature-Based Modules (Backend)
+
+Each feature has its own module directory containing:
+
+- Module definition file (`.module.ts`)
+- Service files (`.service.ts`)
+- Controller files (`.controller.ts`) - if needed
+- Database layer (`db/` subdirectory)
+- Supporting files (guards, decorators, etc.)
+
+### 2. Layered Architecture (Backend)
+
+```
+module/
+├── module.module.ts     # Dependency injection & exports
+├── module.service.ts    # Business logic
+├── module.controller.ts # HTTP endpoints (if needed)
+└── db/                  # Data access layer
+    ├── module.schema.ts     # Database schema
+    └── module.repository.ts # Data operations
+```
+
+### 3. App Router Structure (Frontend)
+
+- Route groups: `(auth)`, `(dashboard)` for logical grouping
+- Catch-all routes: `[[...rest]]` for Clerk's dynamic routing
+- Layouts: `layout.tsx` files for shared UI structure
+- Pages: `page.tsx` files for route components
+
+### 4. Component Organization (Frontend)
+
+- **Components**: Reusable UI components in `/components`
+- **Hooks**: Custom hooks in `/hooks`
+- **Lib**: Utilities and configurations in `/lib`
+- **Providers**: React context providers in `/providers`
+
+## Import/Export Patterns
+
+### Barrel Exports
+
+Use `index.ts` files for clean imports:
+
+```typescript
+// shared-lib/src/index.ts
+export * from "./types/user.types";
+export * from "./types/organization.types";
+export * from "./types/api.types";
+```
+
+### Relative Imports
+
+Use path aliases configured in `tsconfig.json`:
+
+```typescript
+// Frontend
+import { DashboardNav } from "@/components/DashboardNav";
+import { useCurrentUser } from "@/hooks/use-current-user";
+
+// Backend - use relative imports within modules
+import { UserRepository } from "./db/user.repository";
+```
+
+### Module Dependencies
+
+- Frontend can import from `shared-lib`
+- Backend can import from `shared-lib`
+- `shared-lib` should not import from other packages
+- Inter-package imports should go through `shared-lib`
+
+## Configuration File Patterns
+
+### Package-Level Configuration
+
+Each package has its own:
+
+- `package.json` - Dependencies and scripts
+- `tsconfig.json` - TypeScript configuration
+- Framework-specific configs (`next.config.js`, `nest-cli.json`)
+
+### Root-Level Configuration
+
+- `turbo.json` - Turborepo build orchestration
+- `package.json` - Workspace configuration and root scripts
+
+## Database & Repository Patterns
+
+### Schema Definition
+
+```typescript
+// user.schema.ts
+import { Prop, Schema, SchemaFactory } from "@nestjs/mongoose";
+import { Document, Types } from "mongoose";
+
+@Schema({ timestamps: true })
+export class User {
+  @Prop({ required: true, unique: true })
+  clerkId: string;
+
+  @Prop({ required: true })
+  email: string;
+
+  // ... other properties
+}
+
+export type UserDocument = User & Document;
+export const UserSchema = SchemaFactory.createForClass(User);
+```
+
+### Repository Pattern
+
+```typescript
+// user.repository.ts
+@Injectable()
+export class UserRepository {
+  constructor(@InjectModel(User.name) private userModel: Model<UserDocument>) {}
+
+  async findByClerkId(clerkId: string): Promise<User | null> {
+    return this.userModel.findOne({ clerkId }).exec();
+  }
+
+  // ... other repository methods
+}
+```
+
+## API Client Patterns
+
+### Client Configuration
+
+```typescript
+// lib/api/client.ts
+export const apiClient = axios.create({
+  baseURL: process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001",
+  timeout: 10000,
+});
+```
+
+### Endpoint Organization
+
+```typescript
+// lib/api/endpoints/user.ts
+export const userApi = {
+  getCurrentUser: () => apiClient.get("/api/user/profile"),
+  // ... other endpoints
+};
+```
+
+## Authentication Integration
+
+### Clerk Integration
+
+- Frontend uses `@clerk/nextjs` components directly
+- Backend receives webhook events for data synchronization
+- No custom authentication logic required
+- Middleware protects routes using Clerk's built-in functionality
+
+### Protected Routes
+
+```typescript
+// middleware.ts
+import { authMiddleware } from "@clerk/nextjs";
+
+export default authMiddleware({
+  publicRoutes: ["/"],
+  ignoredRoutes: ["/api/webhooks/clerk"],
+});
+```
+
+## Development Workflow
+
+### New Feature Development
+
+1. **Add types** to `shared-lib` if needed
+2. **Backend**: Create module with schema, repository, service
+3. **Frontend**: Create components, hooks, and API endpoints
+4. **Integration**: Connect frontend to backend via API calls
+
+### File Creation Guidelines
+
+- **Always** check for existing similar files before creating new ones
+- **Prefer** editing existing files over creating new ones
+- **Follow** the established naming and directory conventions
+- **Use** TypeScript for all new files
+- **Include** proper imports and exports
+- **Add** appropriate error handling and validation
