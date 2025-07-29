@@ -235,7 +235,7 @@ export default function Organizations() {
                     Organization Dashboard
                   </h3>
                   <p className="text-dark-300 mb-6">
-                    Welcome to {organization.name}. Click "Manage Organization"
+                    Welcome to {organization.name}. Click &quot;Manage Organization&quot;
                     to access settings, invite members, and configure your
                     organization.
                   </p>

@@ -1,5 +1,6 @@
 import { auth } from "@clerk/nextjs/server";
 import Link from "next/link";
+import { UserProfileExample } from "@/components/examples/user-profile-example";
 
 export default async function Dashboard() {
   const { userId } = await auth();
@@ -10,6 +11,15 @@ export default async function Dashboard() {
 
   return (
     <div className="px-4 py-6 sm:px-0">
+      {/* API Demo Section */}
+      <div className="mb-8">
+        <h2 className="text-2xl font-bold text-dark-50 mb-4">API Integration Demo</h2>
+        <p className="text-dark-300 mb-6">
+          This demonstrates the authenticated API infrastructure fetching your user data from the backend:
+        </p>
+        <UserProfileExample />
+      </div>
+
       <div className="glass-card p-8">
         <div className="text-center">
           <h1 className="text-3xl font-bold text-dark-50 mb-8">

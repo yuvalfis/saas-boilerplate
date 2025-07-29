@@ -1,17 +1,22 @@
 import { Injectable } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 import { UserRepository } from "../user/db/user.repository";
 import { OrganizationRepository } from "../organization/db/organization.repository";
+import { EnhancedLoggerService } from "../logger/enhanced-logger.service";
 import { Webhook } from "svix";
 
 @Injectable()
 export class ClerkService {
   private webhook: Webhook;
+  private readonly context = 'ClerkService';
 
   constructor(
     private readonly userRepository: UserRepository,
-    private readonly organizationRepository: OrganizationRepository
+    private readonly organizationRepository: OrganizationRepository,
+    private readonly logger: EnhancedLoggerService,
+    private readonly configService: ConfigService
   ) {
-    this.webhook = new Webhook(process.env.CLERK_WEBHOOK_SECRET || "");
+    this.webhook = new Webhook(this.configService.get<string>('CLERK_WEBHOOK_SECRET') || "");
   }
 
   async processClerkWebhook(
@@ -67,20 +72,20 @@ export class ClerkService {
           await this.handleOrganizationInvitationRevoked(eventData);
           break;
         default:
-          console.log("Unhandled webhook event type:", eventType);
+          // Unhandled webhook event type
       }
 
-      console.log("Webhook processed successfully:", {
-        eventType,
-        webhookId: headers.webhookId,
-      });
+      // Webhook processed successfully
     } catch (error) {
-      console.error("Webhook verification or processing failed:", {
-        error: error.message,
-        webhookId: headers.webhookId,
-        eventType: payload?.type,
-        stack: error.stack,
-      });
+      this.logger.logError(
+        "Webhook verification or processing failed",
+        error,
+        this.context,
+        {
+          webhookId: headers.webhookId,
+          eventType: payload?.type
+        }
+      );
       throw error;
     }
   }
@@ -97,9 +102,8 @@ export class ClerkService {
           profileImageUrl: userData.profile_image_url,
         });
       }
-      console.log("User created/synced:", userData.id);
     } catch (error) {
-      console.error("Error handling user created:", error);
+      this.logger.logError("Error handling user created", error, this.context);
     }
   }
 
@@ -111,9 +115,8 @@ export class ClerkService {
         lastName: userData.last_name || "",
         profileImageUrl: userData.profile_image_url,
       });
-      console.log("User updated:", userData.id);
     } catch (error) {
-      console.error("Error handling user updated:", error);
+      this.logger.logError("Error handling user updated", error, this.context);
     }
   }
 
@@ -123,9 +126,8 @@ export class ClerkService {
       if (user) {
         await this.userRepository.delete((user as any)._id);
       }
-      console.log("User deleted:", userData.id);
     } catch (error) {
-      console.error("Error handling user deleted:", error);
+      this.logger.logError("Error handling user deleted", error, this.context);
     }
   }
 
@@ -144,9 +146,8 @@ export class ClerkService {
           adminIds: [],
         });
       }
-      console.log("Organization created/synced:", orgData.id);
     } catch (error) {
-      console.error("Error handling organization created:", error);
+      this.logger.logError("Error handling organization created", error, this.context);
     }
   }
 
@@ -157,9 +158,8 @@ export class ClerkService {
         slug: orgData.slug,
         logoUrl: orgData.logo_url,
       });
-      console.log("Organization updated:", orgData.id);
     } catch (error) {
-      console.error("Error handling organization updated:", error);
+      this.logger.logError("Error handling organization updated", error, this.context);
     }
   }
 
@@ -171,20 +171,13 @@ export class ClerkService {
       if (organization) {
         await this.organizationRepository.delete((organization as any)._id);
       }
-      console.log("Organization deleted:", orgData.id);
     } catch (error) {
-      console.error("Error handling organization deleted:", error);
+      this.logger.logError("Error handling organization deleted", error, this.context);
     }
   }
 
   private async handleOrganizationMembershipCreated(membershipData: any) {
     try {
-      console.log("Processing organizationMembership.created:", {
-        membershipId: membershipData.id,
-        userId: membershipData.public_user_data?.user_id,
-        organizationId: membershipData.organization?.id,
-        role: membershipData.role,
-      });
 
       const user = await this.userRepository.findByClerkId(
         membershipData.public_user_data.user_id
@@ -194,9 +187,10 @@ export class ClerkService {
       );
 
       if (!user) {
-        console.error(
-          "User not found for membership creation:",
-          membershipData.public_user_data.user_id
+        this.logger.error(
+          `User not found for membership creation: ${membershipData.public_user_data.user_id}`,
+          null,
+          this.context
         );
         throw new Error(
           `User with Clerk ID ${membershipData.public_user_data.user_id} not found`
@@ -204,9 +198,10 @@ export class ClerkService {
       }
 
       if (!organization) {
-        console.error(
-          "Organization not found for membership creation:",
-          membershipData.organization.id
+        this.logger.error(
+          `Organization not found for membership creation: ${membershipData.organization.id}`,
+          null,
+          this.context
         );
         throw new Error(
           `Organization with Clerk ID ${membershipData.organization.id} not found`
@@ -227,10 +222,6 @@ export class ClerkService {
           (organization as any)._id,
           (user as any)._id
         );
-        console.log("Added user to organization members:", {
-          userId: (user as any)._id,
-          organizationId: (organization as any)._id,
-        });
       }
 
       // Update user's organization list
@@ -244,10 +235,6 @@ export class ClerkService {
           (user as any)._id,
           (organization as any)._id
         );
-        console.log("Added organization to user's organization list:", {
-          userId: (user as any)._id,
-          organizationId: (organization as any)._id,
-        });
       }
 
       // Handle admin role
@@ -264,35 +251,22 @@ export class ClerkService {
             (organization as any)._id,
             (user as any)._id
           );
-          console.log("Added user as admin:", {
-            userId: (user as any)._id,
-            organizationId: (organization as any)._id,
-          });
         }
       }
 
-      console.log(
-        "Organization membership created successfully:",
-        membershipData.id
-      );
     } catch (error) {
-      console.error("Error handling organization membership created:", {
-        error: error.message,
-        membershipData,
-        stack: error.stack,
-      });
+      this.logger.logError(
+        "Error handling organization membership created",
+        error,
+        this.context,
+        { membershipData }
+      );
       throw error;
     }
   }
 
   private async handleOrganizationMembershipUpdated(membershipData: any) {
     try {
-      console.log("Processing organizationMembership.updated:", {
-        membershipId: membershipData.id,
-        userId: membershipData.public_user_data?.user_id,
-        organizationId: membershipData.organization?.id,
-        role: membershipData.role,
-      });
 
       const user = await this.userRepository.findByClerkId(
         membershipData.public_user_data.user_id
@@ -302,9 +276,10 @@ export class ClerkService {
       );
 
       if (!user) {
-        console.error(
-          "User not found for membership update:",
-          membershipData.public_user_data.user_id
+        this.logger.error(
+          `User not found for membership update: ${membershipData.public_user_data.user_id}`,
+          null,
+          this.context
         );
         throw new Error(
           `User with Clerk ID ${membershipData.public_user_data.user_id} not found`
@@ -312,9 +287,10 @@ export class ClerkService {
       }
 
       if (!organization) {
-        console.error(
-          "Organization not found for membership update:",
-          membershipData.organization.id
+        this.logger.error(
+          `Organization not found for membership update: ${membershipData.organization.id}`,
+          null,
+          this.context
         );
         throw new Error(
           `Organization with Clerk ID ${membershipData.organization.id} not found`
@@ -338,10 +314,6 @@ export class ClerkService {
           (user as any)._id,
           (organization as any)._id
         );
-        console.log("Added user as member during update (was missing):", {
-          userId: (user as any)._id,
-          organizationId: (organization as any)._id,
-        });
       }
 
       // Update admin status based on role
@@ -359,10 +331,6 @@ export class ClerkService {
             (organization as any)._id,
             (user as any)._id
           );
-          console.log("Promoted user to admin:", {
-            userId: (user as any)._id,
-            organizationId: (organization as any)._id,
-          });
         }
       } else {
         // User should not be admin (member or other role)
@@ -371,34 +339,22 @@ export class ClerkService {
             (organization as any)._id,
             (user as any)._id
           );
-          console.log("Demoted user from admin:", {
-            userId: (user as any)._id,
-            organizationId: (organization as any)._id,
-          });
         }
       }
 
-      console.log(
-        "Organization membership updated successfully:",
-        membershipData.id
-      );
     } catch (error) {
-      console.error("Error handling organization membership updated:", {
-        error: error.message,
-        membershipData,
-        stack: error.stack,
-      });
+      this.logger.logError(
+        "Error handling organization membership updated",
+        error,
+        this.context,
+        { membershipData }
+      );
       throw error;
     }
   }
 
   private async handleOrganizationMembershipDeleted(membershipData: any) {
     try {
-      console.log("Processing organizationMembership.deleted:", {
-        membershipId: membershipData.id,
-        userId: membershipData.public_user_data?.user_id,
-        organizationId: membershipData.organization?.id,
-      });
 
       const user = await this.userRepository.findByClerkId(
         membershipData.public_user_data.user_id
@@ -408,17 +364,17 @@ export class ClerkService {
       );
 
       if (!user) {
-        console.warn(
-          "User not found for membership deletion (may have been deleted):",
-          membershipData.public_user_data.user_id
+        this.logger.warn(
+          `User not found for membership deletion (may have been deleted): ${membershipData.public_user_data.user_id}`,
+          this.context
         );
         return;
       }
 
       if (!organization) {
-        console.warn(
-          "Organization not found for membership deletion (may have been deleted):",
-          membershipData.organization.id
+        this.logger.warn(
+          `Organization not found for membership deletion (may have been deleted): ${membershipData.organization.id}`,
+          this.context
         );
         return;
       }
@@ -428,105 +384,68 @@ export class ClerkService {
         (organization as any)._id,
         (user as any)._id
       );
-      console.log("Removed user from organization:", {
-        userId: (user as any)._id,
-        organizationId: (organization as any)._id,
-      });
 
       // Remove organization from user's list
       await this.userRepository.removeFromOrganization(
         (user as any)._id,
         (organization as any)._id
       );
-      console.log("Removed organization from user's list:", {
-        userId: (user as any)._id,
-        organizationId: (organization as any)._id,
-      });
 
-      console.log(
-        "Organization membership deleted successfully:",
-        membershipData.id
-      );
     } catch (error) {
-      console.error("Error handling organization membership deleted:", {
-        error: error.message,
-        membershipData,
-        stack: error.stack,
-      });
+      this.logger.logError(
+        "Error handling organization membership deleted",
+        error,
+        this.context,
+        { membershipData }
+      );
       throw error;
     }
   }
 
   private async handleOrganizationInvitationCreated(invitationData: any) {
     try {
-      console.log("Processing organizationInvitation.created:", {
-        invitationId: invitationData.id,
-        emailAddress: invitationData.email_address,
-        organizationId: invitationData.organization?.id,
-        role: invitationData.role,
-      });
 
       // For invitation created, we just log it for tracking purposes
       // The actual membership will be created when the invitation is accepted
-      console.log(
-        "Organization invitation created successfully:",
-        invitationData.id
-      );
     } catch (error) {
-      console.error("Error handling organization invitation created:", {
-        error: error.message,
-        invitationData,
-        stack: error.stack,
-      });
+      this.logger.logError(
+        "Error handling organization invitation created",
+        error,
+        this.context,
+        { invitationData }
+      );
       throw error;
     }
   }
 
   private async handleOrganizationInvitationAccepted(invitationData: any) {
     try {
-      console.log("Processing organizationInvitation.accepted:", {
-        invitationId: invitationData.id,
-        emailAddress: invitationData.email_address,
-        organizationId: invitationData.organization?.id,
-        role: invitationData.role,
-      });
 
       // When an invitation is accepted, a organizationMembership.created event should also be triggered
       // So we primarily log this for tracking, but don't duplicate membership creation logic
-      console.log(
-        "Organization invitation accepted successfully:",
-        invitationData.id
-      );
     } catch (error) {
-      console.error("Error handling organization invitation accepted:", {
-        error: error.message,
-        invitationData,
-        stack: error.stack,
-      });
+      this.logger.logError(
+        "Error handling organization invitation accepted",
+        error,
+        this.context,
+        { invitationData }
+      );
       throw error;
     }
   }
 
   private async handleOrganizationInvitationRevoked(invitationData: any) {
     try {
-      console.log("Processing organizationInvitation.revoked:", {
-        invitationId: invitationData.id,
-        emailAddress: invitationData.email_address,
-        organizationId: invitationData.organization?.id,
-      });
 
       // For invitation revoked, we just log it for tracking purposes
       // No membership changes needed since the invitation was never accepted
-      console.log(
-        "Organization invitation revoked successfully:",
-        invitationData.id
-      );
     } catch (error) {
-      console.error("Error handling organization invitation revoked:", {
-        error: error.message,
-        invitationData,
-        stack: error.stack,
-      });
+      this.logger.logError(
+        "Error handling organization invitation revoked",
+        error,
+        this.context,
+        { invitationData }
+      );
       throw error;
     }
   }
